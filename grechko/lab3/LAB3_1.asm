@@ -1,257 +1,324 @@
-MCB_1		SEGMENT
-			ASSUME	CS:MCB_1,	DS:MCB_1,	ES:NOTHING,	SS:NOTHING
-			ORG		100H
-START:		JMP		BEGIN
-; §¡ÕÕò©
-MEMORY_AVL		db		'Available memory :        b', 0dh, 0ah, '$'
-MEMORY_EXT	    db		'Extended  memory :        Kb', 0dh, 0ah, '$'
-MCB_LIST		db		'MCB (memory control box) :', 0dh, 0ah, '$'
-MCB_TYPE		db		'[ type :   h ]$'
-MCB_PSP		    db		'[ address (PSP) :     h ]$'
-MCB_SIZE	    db		'[ size :        b ]$'
-MCB_TAIL		db		'                    ', 0dh, 0ah, '$'
+LAB segment
+	ASSUME cs: LAB, ds: LAB, es: NOTHING, ss: NOTHING
+	org 100h
 
-; Ýâ×¥©§èâò
-;-----------------------------------------------------------
-WRITE_STRING	PROC	near
-			mov		AH, 09h
-			int		21h
-			ret
-WRITE_STRING	ENDP
-;---------------------------
-TETR_TO_HEX		PROC	near
-			and		AL, 0fh
-			cmp		AL, 09
-			jbe		NEXT
-			add		AL, 07
-NEXT:		add		AL, 30h
-			ret
-TETR_TO_HEX		ENDP
-;---------------------------
-BYTE_TO_HEX		PROC 	near
-; ¢ ½å ë AL Ø¨á¨ëÖ¦·åãÞ ë ¦ë  ã·ÒëÖÐ  õ¨ãåÔ. û·ãÐ  ë AX
-			push	CX
-			mov		AH, AL
-			call	TETR_TO_HEX
-			xchg	AL, AH
-			mov		CL, 4
-			shr		AL, CL
-			call	TETR_TO_HEX ; ë AL ãå áõ Þ ¤·ªá 
-			pop		CX 			; ë AH ÒÐ ¦õ Þ
-			ret
-BYTE_TO_HEX		ENDP
-;--------------------------
-WRD_TO_HEX		PROC	near
-; Ø¨áëÖ¦ ë 16 ã/ã 16-å· á óáÞ¦ÔÖ¬Ö û·ãÐ 
-; ë AX - û·ãÐÖ, DI -  ¦á¨ã ØÖãÐ¨¦Ô¨¬Ö ã·ÒëÖÐ 
-			push	BX
-			mov		BH, AH
-			call	BYTE_TO_HEX
-			mov		[DI], AH
-			dec		DI
-			mov		[DI], AL
-			dec		DI
-			mov		AL, BH
-			call	BYTE_TO_HEX
-			mov		[DI], AH
-			dec		DI
-			mov		[DI], AL
-			pop		BX
-			ret
-WRD_TO_HEX		ENDP
-;--------------------------
-BYTE_TO_DEC 	PROC 	near
-; Ø¨á¨ëÖ¦ ë 10 ã/ã, SI -  ¦á¨ã ØÖÐÞ ÒÐ ¦õ¨½ ¤·ªáñ
-            push    CX
-            push    DX
-            xor     AH, AH
-            xor     DX, DX
-            mov     CX, 10
-LOOP_BD:    div     CX
-          	or      DL, 30h
-			mov     [SI], DL
-			dec     SI
-			xor     DX, DX
-			cmp     AX, 10
-			jae     LOOP_BD
-			cmp     AL, 00h
-			je      END_BD
-			or      AL, 30h
-			mov     [SI], AL
-END_BD:		pop     DX
-			pop 	CX
-          	ret
-BYTE_TO_DEC    	ENDP
-;--------------------------
-; Ø¨á¨ëÖ¦ ë 10 ã/ã, SI -  ¦á¨ã ØÖÐÞ ÒÐ ¦õ¨½ ¤·ªáñ
-WRD_TO_DEC		PROC	near
-			push	CX
-			push	DX
-			push	AX
-			
-			mov		CX, 10
-LOOP_WD:	div		CX
-			or		DL,	30h
-			mov		[SI], DL
-			dec		SI
-			xor		DX, DX
-			cmp		AX, 10
-			jae		LOOP_WD
-			cmp		AX, 00h
-			jbe		END_WD
-			or		AL, 30h
-			mov		[SI], AL
-END_WD:		pop		AX
-			pop		DX
-			pop		CX
-			ret
-WRD_TO_DEC		ENDP
-;--------------------------
-; ÖØá¨¦¨Ð¨Ô·¨ ÆÖÐ·û¨ãåë  ¦ÖãåçØÔÖ½ Ø ÒÞå·
-DEF_MEMORY_AVL	PROC	near
-			push	AX
-			push	BX
-			push	CX
-			push	DX
-			
-			mov		BX, 0FFFFh
-			mov		AH, 4Ah
-			int		21h
-			mov		AX, BX
-			mov 	CX,	10h
-			mul		CX
-			lea		SI,	MEMORY_AVL + 24
-			call	WRD_TO_DEC
-			lea		DX, MEMORY_AVL
-			call	WRITE_STRING
-			
-			pop		DX
-			pop		CX
-			pop		BX
-			pop		AX
-			ret
-DEF_MEMORY_AVL	ENDP
-;--------------------------
-; ÖØá¨¦¨Ð¨Ô·¨ ÆÖÐ·û¨ãåë  á ãõ·á¨ÔÔÖ½ Ø ÒÞå·
-DEF_MEMORY_EXT	PROC	near
-			push	AX
-			push	BX
-			push	SI
-			push	DX
-			
-			mov		AL, 30h
-			out		70h, AL
-			in		AL, 71h
-			mov		BL, AL
-			mov		Al, 31h
-			out		70h, AL
-			in		AL,	71h
-			mov		AH,	AL
-			mov		AL,	BL
-			sub		DX,	DX
-			lea		SI, MEMORY_EXT + 24
-			call	WRD_TO_DEC
-			lea		DX,	MEMORY_EXT
-			call	WRITE_STRING
-			
-			pop		DX
-			pop		SI
-			pop		BX
-			pop		AX
-			ret
-DEF_MEMORY_EXT	ENDP
-;--------------------------
-; ÖØá¨¦¨Ð¨Ô·¨ ÆÖÐ·û¨ãåë  á ãõ·á¨ÔÔÖ½ Ø ÒÞå·
-DEF_MCB			PROC	near
-			push	AX
-			push	BX
-			push	CX
-			push	DX
-			lea		DX, MCB_TAIL
-			call	WRITE_STRING
-			lea 	DX,	MCB_LIST
-			call	WRITE_STRING
-			mov		AH, 52h
-			int		21h
-			mov		ES, ES:[BX - 2]
-			mov		BX, 1
-WHILE_MCB:	sub		AX, AX
-			sub		CX, CX
-			sub		DI, DI
-			sub		SI, SI
-			mov		AL, ES:[0000h]
-			call 	BYTE_TO_HEX
-			lea		DI, MCB_TYPE + 9
-			mov		[DI], AX
-			cmp		AX, 4135h
-			je 		DEF_BX
-CONTINUE_1:	lea		DI, MCB_PSP + 21
-			mov		AX, ES:[0001h]
-			call 	WRD_TO_HEX
-			mov		AX, ES:[0003h]
-			mov 	CX, 10h
-	    	mul 	CX
-	    	lea		SI,	MCB_SIZE + 14
-			call 	WRD_TO_DEC
-			lea		DX, MCB_TYPE
-			call 	WRITE_STRING
-			lea 	DX, MCB_PSP
-			call 	WRITE_STRING
-			lea 	DX, MCB_SIZE
-			call 	WRITE_STRING
-			lea		SI, MCB_TAIL + 4
-			jmp		LOOP_TAIL
-CONTINUE_2:	lea		DX,	MCB_TAIL
-			call 	WRITE_STRING
-			cmp		BX, 0
-			jz		END_MCB
-			xor 	AX, AX
-	    	mov 	AX, ES
-	    	add 	AX, ES:[0003h]
-	    	inc 	AX
-	    	mov 	ES, AX
-			jmp 	WHILE_MCB
-END_MCB:	pop		DX
-			pop		CX
-			pop		BX
-			pop		AX
-			ret
-DEF_BX:		mov		BX,0
-			jmp 	CONTINUE_1
-LOOP_TAIL:	push 	SI
-			push 	CX
-			push 	BX
-			push 	AX
-			mov		BX, 0008h
-			mov		CX, 4
-WHILE_T:	mov		AX, ES:[bx]
-			mov		[SI], AX
-			add 	BX, 2h
-			add		SI, 2h
-			loop 	WHILE_T
-			pop		AX
-	    	pop		BX
-	    	pop		CX
-			pop		SI
-			jmp		CONTINUE_2
-DEF_MCB			ENDP
-;--------------------------
-; Ø¨û åí á¨óçÐíå åÖë · ëñµÖ¦ ë DOS
-BEGIN:		call	DEF_MEMORY_AVL
-			call	DEF_MEMORY_EXT
-			call	DEF_MCB
-			mov		AH, 4Ch
-			int		21h
-			ret
-MCB_1			ENDS
-END 	START
+START: jmp BEGIN
 
+AVL_MEMORY_INFO     db  "Available memory: $"
+EXT_MEMORY_INFO     db  "Extended memory: $"
+MCB_INFO            db  "MCBs:", 0Dh, 0Ah, "$"
 
+MCB_NUM_INFO 		db  "MCB number $"
+AREA_SIZE_INFO 		db  ", size = $"
+OCCUPANT_INFO       db  "; occupied by: $"
 
+END_LINE 			db  0Dh, 0Ah, "$"
+BYTES               db  " bytes$"
+KBYTES              db  " kbytes", 0Dh, 0Ah, "$"
 
+OWNER_INFO 			db  0Dh, 0Ah, "Block is $"
+OWNER_UNKNOWN       db  "owned by PSP = $"
+OWNER_FREE 			db  "free$"
+OWNER_XMS 			db  "occupied by OS XMS UMB$"
+OWNER_TM 			db  "occupied by driver's top memory$"
+OWNER_DOS 			db  "occupied by MS DOS$"
+OWNER_386CB 		db  "busy by 386MAX UMB$"
+OWNER_386B 			db  "blocked by 386MAX$"
+OWNER_386 			db  "occupied by 386MAX UMB$"
 
+OCCUPANT_UNKNOWN 	db  "no info$"
 
+;-------------------------------------------------------------------------------
 
+PRINT_STRING PROC NEAR ; (DX : String)
+	push 	ax
 
+	mov 	ah, 09h
+	int		21h
 
+	pop 	ax
+	ret
+PRINT_STRING ENDP
 
+DEC_WORD_PRINT PROC NEAR ; (AX : short)
+	push 	ax
+	push 	cx
+	push	dx
+	push	bx
+
+	mov 	bx, 10
+	xor 	cx, cx
+
+NUM:
+	div 	bx
+	push	dx
+	xor 	dx, dx
+	inc 	cx
+	cmp 	ax, 0h
+	jnz 	NUM
+
+PRINT_NUM:
+	pop 	dx
+	or 		dl, 30h
+	mov 	ah, 02h
+	int 	21h
+	loop 	PRINT_NUM
+
+	pop 	bx
+	pop 	dx
+	pop 	cx
+	pop 	ax
+	ret
+DEC_WORD_PRINT ENDP
+
+HEX_BYTE_PRINT PROC NEAR ; (AL : byte)
+	push 	ax
+	push 	bx
+	push 	dx
+
+	mov 	ah, 0
+	mov 	bl, 10h
+	div 	bl
+	mov 	dx, ax
+	mov 	ah, 02h
+	cmp 	dl, 0Ah
+	jl 		PRINT
+	add 	dl, 07h
+
+PRINT:
+	add 	dl, '0'
+	int 	21h;
+
+	mov 	dl, dh
+	cmp 	dl, 0Ah
+	jl 		PRINT_EXT
+	add 	dl, 07h
+
+PRINT_EXT:
+	add 	dl, '0'
+	int 	21h;
+
+	pop 	dx
+	pop 	bx
+	pop 	ax
+	ret
+HEX_BYTE_PRINT ENDP
+
+HEX_WORD_PRINT PROC	NEAR ; (AX : short)
+	push 	ax
+	push 	ax
+	mov 	al, ah
+	call 	HEX_BYTE_PRINT
+	pop 	ax
+	call 	HEX_BYTE_PRINT
+	pop 	ax
+	ret
+HEX_WORD_PRINT ENDP
+
+;-------------------------------------------------------------------------------
+
+PRINT_AVL_MEMORY PROC NEAR
+	push    ax
+	push    bx
+	push    dx
+
+	mov     dx, offset AVL_MEMORY_INFO
+	call    PRINT_STRING
+
+	xor     ax, ax
+	int 	12h
+	xor     dx, dx
+	call    DEC_WORD_PRINT
+
+    mov     dx, offset KBYTES
+    call    PRINT_STRING
+
+	pop     dx
+	pop     bx
+	pop     ax
+	ret
+PRINT_AVL_MEMORY ENDP
+
+PRINT_EXT_MEMORY PROC NEAR
+	push 	ax
+	push 	bx
+	push 	dx
+
+    mov 	dx, offset EXT_MEMORY_INFO
+	call 	PRINT_STRING
+
+    mov 	al, 30h
+	out 	70h, al
+	in 		al, 71h
+	mov 	bl, al
+	mov 	al, 31h
+	out 	70h, al
+	in 		al, 71h
+	mov 	ah, al
+	mov 	al, bl
+	xor     dx, dx
+	call 	DEC_WORD_PRINT
+
+    mov     dx, offset KBYTES
+    call    PRINT_STRING
+
+	pop 	dx
+	pop 	bx
+	pop 	ax
+	ret
+PRINT_EXT_MEMORY ENDP
+
+PRINT_MCB PROC near
+	push 	ax
+	push 	bx
+	push 	cx
+	push 	dx
+	push 	es
+	push 	si
+
+    mov     dx, offset MCB_INFO
+	call    PRINT_STRING
+
+	mov 	ah, 52h
+	int 	21h
+	mov 	ax, es:[bx-2]
+	mov 	es, ax
+	xor 	cx, cx
+    push    cx
+
+NEXT_MCB:
+    pop     cx
+    mov 	dx, offset MCB_NUM_INFO
+    call 	PRINT_STRING
+    inc 	cx
+	mov 	ax, cx
+	xor     dx, dx
+	call	DEC_WORD_PRINT
+    push 	cx
+
+OWNER_START:
+	mov 	dx, offset OWNER_INFO
+	call 	PRINT_STRING
+	mov 	ax, es:[1h]
+
+	cmp 	ax, 0h
+	je 		PRINT_FREE
+	cmp 	ax, 6h
+	je 		PRINT_XMS
+	cmp 	ax, 7h
+	je 		PRINT_TM
+	cmp 	ax, 8h
+	je 		PRINT_DOS
+	cmp 	ax, 0FFFAh
+	je 		PRINT_386CB
+	cmp 	ax, 0FFFDh
+	je 		PRINT_386B
+	cmp 	ax, 0FFFEh
+	je 		PRINT_386
+
+    mov 	dx, offset OWNER_UNKNOWN
+    call 	PRINT_STRING
+	call 	HEX_WORD_PRINT
+	jmp 	AREA_SIZE
+
+PRINT_FREE:
+	mov 	dx, offset OWNER_FREE
+    call 	PRINT_STRING
+	jmp 	AREA_SIZE
+PRINT_XMS:
+	mov 	dx, offset OWNER_XMS
+    call 	PRINT_STRING
+	jmp 	AREA_SIZE
+PRINT_TM:
+	mov 	dx, offset OWNER_TM
+    call 	PRINT_STRING
+	jmp 	AREA_SIZE
+PRINT_DOS:
+	mov 	dx, offset OWNER_DOS
+    call 	PRINT_STRING
+	jmp 	AREA_SIZE
+PRINT_386CB:
+	mov 	dx, offset OWNER_386CB
+    call 	PRINT_STRING
+	jmp 	AREA_SIZE
+PRINT_386B:
+	mov 	dx, offset OWNER_386B
+    call 	PRINT_STRING
+	jmp 	AREA_SIZE
+PRINT_386:
+	mov 	dx, offset OWNER_386
+	call 	PRINT_STRING
+
+AREA_SIZE:
+	mov 	dx, offset AREA_SIZE_INFO
+	call 	PRINT_STRING
+
+	mov 	ax, es:[3h]
+	mov 	bx, 10h
+	mul 	bx
+	call 	DEC_WORD_PRINT
+
+    mov     dx, offset BYTES
+    call    PRINT_STRING
+
+    mov 	dx, offset OCCUPANT_INFO
+	call 	PRINT_STRING
+
+    mov     ax, es:[8h]
+    cmp     ax, 0h
+    je      NO_OCCUPANT
+
+	mov 	cx, 8
+	xor 	si, si
+OCCUPANT:
+	mov     dl, es:[si + 8h]
+    mov     ah, 02h
+	int     21h
+	inc     si
+	loop    OCCUPANT
+    jmp     PROCEEDING
+
+NO_OCCUPANT:
+    mov 	dx, offset OCCUPANT_UNKNOWN
+    call 	PRINT_STRING
+
+PROCEEDING:
+    xor 	ax, ax
+	mov 	al, es:[0h]
+    cmp     al, 5Ah
+	je      ENDING
+
+	mov 	ax, es:[3h]
+	mov     bx, es
+	add     bx, ax
+	inc     bx
+	mov     es, bx
+
+    mov     dx, offset END_LINE
+	call    PRINT_STRING
+	jmp     NEXT_MCB
+
+ENDING:
+	pop		cx
+	pop     si
+	pop     es
+	pop     dx
+	pop     cx
+	pop     bx
+	pop     ax
+	ret
+PRINT_MCB ENDP
+
+BEGIN:
+    call    PRINT_AVL_MEMORY
+	call	PRINT_EXT_MEMORY
+    call    PRINT_MCB
+
+    xor     al, al
+	mov     ah, 4Ch
+    int     21h
+
+PROGRAMM_END:
+
+LAB ends
+end START
